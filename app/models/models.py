@@ -21,6 +21,7 @@ class Orders(Base):
     order_id = Column(Integer, primary_key=True, index=True)
     longitude = Column(String, index=True)
     latitude = Column(String, index=True)
+    order_weight = Column(float, index=True)
     order_driver_id = Column(Integer, ForeignKey("drivers.driver_id"))
     order_schedule_id = Column(Integer, ForeignKey("schedules.schedule_id"))
     
