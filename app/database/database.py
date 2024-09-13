@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-URL_DATABASE = 'postgresql://postgres:Dima%402020@localhost:5432/HSA_Driver_Map_db'
+URL_DATABASE = 'postgresql://postgres:Dhanu123#@localhost:5432/HSA_Driver_Map_db'
 
 engine = create_engine(URL_DATABASE)
 
