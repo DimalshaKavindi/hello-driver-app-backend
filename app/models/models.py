@@ -1,6 +1,14 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float
 from app.database.database import Base
 
+
+class Location(Base):
+    __tablename__ = 'locations'
+    id = Column(Integer, primary_key=True, index=True)
+    address = Column(String, index=True)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    
 class Driver(Base):
     __tablename__ = 'drivers'
     
