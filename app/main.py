@@ -8,6 +8,6 @@ app = FastAPI()
 app.include_router(driver.router, prefix="/api/v1", tags=["drivers"])
 
 # Include the router for the route optimization functionality
-app.include_router(optimize.router, prefix="/api/v1", tags=["optimize"])
 
 # Now, the /optimize_route/ will be available at: /api/v1/optimize_route
+app.include_router(optimize.router, prefix="/api/route_optimize", tags=["routes"])
