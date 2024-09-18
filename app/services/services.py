@@ -1,34 +1,51 @@
 import requests
+import csv
 import json
 import urllib
+import pandas as pd
 from fastapi import FastAPI, HTTPException
 from typing import List
+from datetime import datetime
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
+app = FastAPI()
+
+def time_to_minutes(time_str):
+    """Convert time string (e.g., '8:00AM') to minutes since midnight."""
+    dt = datetime.strptime(time_str, '%I:%M%p')
+    return dt.hour * 60 + dt.minute
+
+def read_data_from_csv(file_path):
+    df = pd.read_csv(file_path)
+    addresses = df[['location_latitude', 'location_longitude']].values.tolist()
+    demands = df['order_weight'].tolist()
+    
+    # Convert time windows to hours
+    time_windows = []
+    for from_time, to_time in zip(df['from'], df['to']):
+        from_minute = time_to_minutes(from_time)
+        to_minute = time_to_minutes(to_time)
+        time_windows.append((from_minute, to_minute))
+    
+    return addresses, demands, time_windows
+
 def create_data():
-    """Creates the data."""
+    """Creates the data from CSV file."""
+    file_path = r'D:\Intern\hello-driver-app-backend\app\models\orders.csv'
+    addresses, demands, time_windows = read_data_from_csv(file_path)
+    
     data = {}
     data['API_key'] = 'AIzaSyDErHVOpa4XB1Iewo2mWU6Y44I7OelMWSE'
-    data['addresses'] = ['3610+Hacks+Cross+Rd+Memphis+TN',  # depot
-                        '1921+Elvis+Presley+Blvd+Memphis+TN',
-                        '149+Union+Avenue+Memphis+TN',
-                        '1034+Audubon+Drive+Memphis+TN',
-                        '1532+Madison+Ave+Memphis+TN',
-                        '706+Union+Ave+Memphis+TN',
-                        '3641+Central+Ave+Memphis+TN',
-                        '926+E+McLemore+Ave+Memphis+TN',
-                        '4339+Park+Ave+Memphis+TN',
-                        '600+Goodwyn+St+Memphis+TN',
-                        '2000+North+Pkwy+Memphis+TN',
-                        '262+Danny+Thomas+Pl+Memphis+TN',
-                        '125+N+Front+St+Memphis+TN',
-                        '5959+Park+Ave+Memphis+TN',
-                        '814+Scott+St+Memphis+TN',
-                        '1005+Tillman+St+Memphis+TN'
-                        ]
+    data['addresses'] = addresses
+    data['demands'] = demands
+    data['time_windows'] = time_windows
+    data['vehicle_capacities'] = [300, 300, 300, 500, 300, 300, 300, 300, 300, 300]
+    data['num_vehicles'] = 10
+    data['depot'] = 0
+    
     return data
 
-def create_distance_matrix(data):
+def create_matrix(data):
     addresses = data["addresses"]
     API_key = data["API_key"]
     max_elements = 100
@@ -37,24 +54,25 @@ def create_distance_matrix(data):
     q, r = divmod(num_addresses, max_rows)
     dest_addresses = addresses
     distance_matrix = []
+    time_matrix = []
     
     for i in range(q):
         origin_addresses = addresses[i * max_rows: (i + 1) * max_rows]
         response = send_request(origin_addresses, dest_addresses, API_key)
         distance_matrix += build_distance_matrix(response)
+        time_matrix += build_time_matrix(response)
 
     if r > 0:
         origin_addresses = addresses[q * max_rows: q * max_rows + r]
         response = send_request(origin_addresses, dest_addresses, API_key)
         distance_matrix += build_distance_matrix(response)
-    return distance_matrix
+        time_matrix += build_time_matrix(response)
+    return distance_matrix,time_matrix
 
 def send_request(origin_addresses, dest_addresses, API_key):
     def build_address_str(addresses):
-        address_str = ''
-        for i in range(len(addresses) - 1):
-            address_str += addresses[i] + '|'
-        address_str += addresses[-1]
+         # Format latitude and longitude as 'lat,long'
+        address_str = '|'.join([f'{lat},{long}' for lat, long in addresses])
         return address_str
 
     request = 'https://maps.googleapis.com/maps/api/distancematrix/json?units=imperial'
@@ -72,44 +90,92 @@ def build_distance_matrix(response):
         distance_matrix.append(row_list)
     return distance_matrix
 
+def build_time_matrix(response):
+    time_matrix = []
+    for row in response['rows']:
+        row_list = [row['elements'][j]['duration']['value'] for j in range(len(row['elements']))]
+        # Convert seconds to minutes (or any unit you prefer)
+        row_list = [time // 60 for time in row_list]  # Time in minutes
+        time_matrix.append(row_list)
+    return time_matrix
+
 def create_data_model():
-    """Stores the data for the problem."""
+    """Stores the data for the problem, including both distance and time matrices."""
     data = {}
-    data['distance_matrix'] = create_distance_matrix(create_data())
-    data["demands"] = [0, 1, 1, 2, 4, 2, 4, 8, 8, 1, 2, 1, 2, 4, 4, 8]
-    data["vehicle_capacities"] = [60]
-    data["num_vehicles"] = 1
-    data["depot"] = 0
+    data_model = create_data()
+    distance_matrix, time_matrix = create_matrix(data_model)
+    
+    data['distance_matrix'] = distance_matrix     # In meter
+    data['time_matrix'] = time_matrix             # In minutes
+    data["time_windows"] = data_model["time_windows"]
+    data["demands"] = data_model["demands"]
+    data["vehicle_capacities"] = data_model["vehicle_capacities"]
+    data["num_vehicles"] = data_model["num_vehicles"]
+    data["depot"] = data_model["depot"]
+    
     return data
 
-def distance_callback(from_index, to_index, data, manager):
-    """Returns the distance between two nodes."""
-    from_node = manager.IndexToNode(from_index)
-    to_node = manager.IndexToNode(to_index)
-    return data['distance_matrix'][from_node][to_node]
-
-def demand_callback(from_index, data, manager):
-    """Returns the demand of the node."""
-    from_node = manager.IndexToNode(from_index)
-    return data['demands'][from_node]
 
 def solve_vrp():
     """Solves the CVRP and returns a structured solution."""
     data = create_data_model()
-
-    # Create the routing index manager.
-    manager = pywrapcp.RoutingIndexManager(len(data['distance_matrix']), data['num_vehicles'], data['depot'])
-
-    # Create Routing Model.
+    #Create node index to variable index mapping
+    manager = pywrapcp.RoutingIndexManager(len(data['time_matrix']),len(data['vehicle_capacities']), data['depot']) 
+    # Create Routing Model
     routing = pywrapcp.RoutingModel(manager)
 
-    # Register distance and demand callbacks.
-    transit_callback_index = routing.RegisterTransitCallback(lambda from_index, to_index: distance_callback(from_index, to_index, data, manager))
-    demand_callback_index = routing.RegisterUnaryTransitCallback(lambda from_index: demand_callback(from_index, data, manager))
+    # Create and register a transit callback
+    def time_callback(from_index, to_index):
+        """Returns the travel time between the two nodes."""
+        # Convert from routing variable Index to time matrix NodeIndex.
+        from_node = manager.IndexToNode(from_index)
+        to_node = manager.IndexToNode(to_index)
+        return data['time_matrix'][from_node][to_node]
 
-    # Set arc cost evaluator (distance).
+    transit_callback_index = routing.RegisterTransitCallback(time_callback)
+    # Define cost of each arc.
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
+    # Add Time Windows constraint.
+    time = 'Time'
+    routing.AddDimension(
+        transit_callback_index,
+        10,  # allow waiting time (min)
+        1500, #maximum time per vehicle
+        False,  # Don't force start cumul to zero.
+        time)
+    time_dimension = routing.GetDimensionOrDie(time)
+
+    # Add time window constraints for each location except depot - (one can define time window constraints for depot as well by small modifications in below code)
+    for location_idx, time_window in enumerate(data['time_windows']):
+        if location_idx == data['depot']:
+            continue
+        index = manager.NodeToIndex(location_idx)
+        time_dimension.CumulVar(index).SetRange(time_window[0], time_window[1])
+
+
+    # Add time window constraints for each vehicle start node.
+    depot_idx = data['depot']
+    for vehicle_id in range(len(data['vehicle_capacities'])):
+        index = routing.Start(vehicle_id)
+        time_dimension.CumulVar(index).SetRange(
+            data['time_windows'][depot_idx][0],
+            data['time_windows'][depot_idx][1])
+
+    # Instantiate route start and end times to produce feasible times.
+    for i in range(len(data['vehicle_capacities'])):
+        routing.AddVariableMinimizedByFinalizer(
+            time_dimension.CumulVar(routing.Start(i)))
+        routing.AddVariableMinimizedByFinalizer(
+            time_dimension.CumulVar(routing.End(i)))
+
+    # Add Capacity Weight constraint.
+    def demand_callback(from_index):
+        # Convert from routing variable Index to demands NodeIndex.
+        from_node = manager.IndexToNode(from_index)
+        return data['demands'][from_node]
+    demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
+    
     # Add Capacity constraint.
     routing.AddDimensionWithVehicleCapacity(
         demand_callback_index,
@@ -119,11 +185,10 @@ def solve_vrp():
         "Capacity"
     )
 
-    # Set up search parameters.
+    # Setting first solution heuristic.
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
-    search_parameters.first_solution_strategy = routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC
-    search_parameters.local_search_metaheuristic = routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-    search_parameters.time_limit.FromSeconds(1)
+    search_parameters.first_solution_strategy = (
+        routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
 
     # Solve the problem.
     solution = routing.SolveWithParameters(search_parameters)
@@ -135,32 +200,42 @@ def solve_vrp():
         raise HTTPException(status_code=500, detail="No solution found!")
 
 
+# function to print the results/solution
 def print_solution(data, manager, routing, solution):
-    """Prints solution on console."""
-    print(f"Objective: {solution.ObjectiveValue()}")
+    print(f'Objective: {solution.ObjectiveValue()}') # the objective function
+    time_dimension = routing.GetDimensionOrDie('Time')
+    total_time = 0
     total_distance = 0
-    total_load = 0
-    for vehicle_id in range(data["num_vehicles"]):
+    total_loadLB = 0
+    total_loadM3 = 0
+    for vehicle_id in range(len(data['vehicle_capacities'])):
         index = routing.Start(vehicle_id)
-        plan_output = f"Route for vehicle {vehicle_id}:\n"
+        plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
+        loading_output = 'Load for vehicle {}:'.format(vehicle_id)
         route_distance = 0
-        route_load = 0
+        route_loadLB = 0
         while not routing.IsEnd(index):
-            node_index = manager.IndexToNode(index)
-            route_load += data["demands"][node_index]
-            plan_output += f" {node_index} Load({route_load}) -> "
-            previous_index = index
+            time_var = time_dimension.CumulVar(index)
+            plan_output += '{0} Time({1},{2}) -> '.format(
+                manager.IndexToNode(index), solution.Min(time_var), solution.Max(time_var))
             index = solution.Value(routing.NextVar(index))
-            route_distance += routing.GetArcCostForVehicle(
-                previous_index, index, vehicle_id
-            )
-        plan_output += f" {manager.IndexToNode(index)} Load({route_load})\n"
-        plan_output += f"Distance of the route: {route_distance}m\n"
-        plan_output += f"Load of the route: {route_load}\n"
+            node_index = manager.IndexToNode(index)
+            route_loadLB += data['demands'][node_index]
+            loading_output += ' {0} Load({1}) -> '.format(node_index, route_loadLB)
+            previous_index = index
+            route_distance += routing.GetArcCostForVehicle(previous_index, index, vehicle_id)
+        time_var = time_dimension.CumulVar(index)
+        plan_output += '{0} Time({1},{2})\n'.format(manager.IndexToNode(index),
+                                                    solution.Min(time_var),
+                                                    solution.Max(time_var))
+        plan_output += 'Time of the route: {}min\n'.format(solution.Min(time_var))
+        plan_output += 'Distance of the route: {}m'.format(route_distance)
+        loading_output += 'Load of the route: {}\n'.format(route_loadLB)
         print(plan_output)
+        print(loading_output)
         total_distance += route_distance
-        total_load += route_load
-    print(f"Total distance of all routes: {total_distance}m")
-    print(f"Total load of all routes: {total_load}")
-
-
+        total_loadLB += route_loadLB
+        total_time += solution.Min(time_var)
+    print('Total time of all routes: {}min'.format(total_time))
+    print('Total distance of all routes: {}m'.format(total_distance))
+    print('Total load of all routes: {}\n'.format(total_loadLB))

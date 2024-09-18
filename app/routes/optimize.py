@@ -1,18 +1,20 @@
 from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any
-from app.services.services import create_data, create_distance_matrix, solve_vrp
+from typing import List
+from app.services.services import solve_vrp, create_data, create_matrix
 
 router = APIRouter()
 
-@router.get("/distance_matrix", response_model=List[List[int]])
+@router.get("/distance_matrix")
 async def get_distance_matrix():
     try:
         data = create_data()
-        distance_matrix = create_distance_matrix(data)
-        return distance_matrix
+        time_windows = data["time_windows"]
+        distance_matrix, time_matrix = create_matrix(data)
+        return {"distance_matrix": distance_matrix, "time_matrix": time_matrix, "time_windows" : time_windows}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error building distance matrix: {e}")
-    
+
+
 @router.get("/solve_vrp")
 async def solve_vrp_endpoint():
     try:
