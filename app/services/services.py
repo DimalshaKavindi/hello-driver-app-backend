@@ -13,7 +13,7 @@ app = FastAPI()
 def time_to_minutes(time_str):
     """Convert time string (e.g., '8:00AM') to minutes since midnight."""
     dt = datetime.strptime(time_str, '%I:%M%p')
-    return dt.hour * 60 + dt.minute
+    return (dt.hour-8) * 60 + dt.minute
 
 def read_data_from_csv(file_path):
     df = pd.read_csv(file_path)
@@ -29,21 +29,22 @@ def read_data_from_csv(file_path):
     
     return addresses, demands, time_windows
 
+
 def create_data():
-    """Creates the data from CSV file."""
     file_path = r'D:\Intern\hello-driver-app-backend\app\models\orders.csv'
     addresses, demands, time_windows = read_data_from_csv(file_path)
     
     data = {}
     data['API_key'] = 'AIzaSyDErHVOpa4XB1Iewo2mWU6Y44I7OelMWSE'
     data['addresses'] = addresses
-    data['demands'] = demands
-    data['time_windows'] = time_windows
-    data['vehicle_capacities'] = [300, 300, 300, 500, 300, 300, 300, 300, 300, 300]
-    data['num_vehicles'] = 10
+    data["demands"] = demands
+    data["time_windows"] = time_windows
+    data["vehicle_capacities"] = [10, 10, 80, 20]
+    data['num_vehicles'] = 4
     data['depot'] = 0
     
     return data
+
 
 def create_matrix(data):
     addresses = data["addresses"]
@@ -71,8 +72,13 @@ def create_matrix(data):
 
 def send_request(origin_addresses, dest_addresses, API_key):
     def build_address_str(addresses):
-         # Format latitude and longitude as 'lat,long'
-        address_str = '|'.join([f'{lat},{long}' for lat, long in addresses])
+        address_str = ''
+        for i in range(len(addresses)):
+        # Each address should be formatted as 'lat,lng'
+            lat, lng = addresses[i]
+            address_str += f'{lat},{lng}'
+            if i < len(addresses) - 1:
+                address_str += '|'
         return address_str
 
     request = 'https://maps.googleapis.com/maps/api/distancematrix/json?units=imperial'
@@ -94,7 +100,7 @@ def build_time_matrix(response):
     time_matrix = []
     for row in response['rows']:
         row_list = [row['elements'][j]['duration']['value'] for j in range(len(row['elements']))]
-        # Convert seconds to minutes (or any unit you prefer)
+         # Convert seconds to minutes (or any unit you prefer)
         row_list = [time // 60 for time in row_list]  # Time in minutes
         time_matrix.append(row_list)
     return time_matrix
@@ -115,6 +121,23 @@ def create_data_model():
     
     return data
 
+def distance_callback(from_index, to_index, data, manager):
+    """Returns the distance between two nodes."""
+    from_node = manager.IndexToNode(from_index)
+    to_node = manager.IndexToNode(to_index)
+    return data['distance_matrix'][from_node][to_node]
+
+def demand_callback(from_index, data, manager):
+    """Returns the demand of the node."""
+    from_node = manager.IndexToNode(from_index)
+    return data['demands'][from_node]
+
+def time_callback(from_index, to_index, data, manager):
+        """Returns the travel time between the two nodes."""
+        # Convert from routing variable Index to time matrix NodeIndex.
+        from_node = manager.IndexToNode(from_index)
+        to_node = manager.IndexToNode(to_index)
+        return data['time_matrix'][from_node][to_node]
 
 def solve_vrp():
     """Solves the CVRP and returns a structured solution."""
@@ -141,7 +164,7 @@ def solve_vrp():
     routing.AddDimension(
         transit_callback_index,
         10,  # allow waiting time (min)
-        1500, #maximum time per vehicle
+        1900,  # maximum time (min) per vehicle in a route (8 hours)
         False,  # Don't force start cumul to zero.
         time)
     time_dimension = routing.GetDimensionOrDie(time)
@@ -154,7 +177,7 @@ def solve_vrp():
         time_dimension.CumulVar(index).SetRange(time_window[0], time_window[1])
 
 
-    # Add time window constraints for each vehicle start node.
+     # Add time window constraints for each vehicle start node.
     depot_idx = data['depot']
     for vehicle_id in range(len(data['vehicle_capacities'])):
         index = routing.Start(vehicle_id)
@@ -201,41 +224,56 @@ def solve_vrp():
 
 
 # function to print the results/solution
+# function to print the results/solution
 def print_solution(data, manager, routing, solution):
-    print(f'Objective: {solution.ObjectiveValue()}') # the objective function
+    print(f'Objective: {solution.ObjectiveValue()}')  # The objective function
     time_dimension = routing.GetDimensionOrDie('Time')
     total_time = 0
     total_distance = 0
     total_loadLB = 0
-    total_loadM3 = 0
-    for vehicle_id in range(len(data['vehicle_capacities'])):
+    
+    for vehicle_id in range(data["num_vehicles"]):
         index = routing.Start(vehicle_id)
         plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
-        loading_output = 'Load for vehicle {}:'.format(vehicle_id)
         route_distance = 0
         route_loadLB = 0
+        
         while not routing.IsEnd(index):
             time_var = time_dimension.CumulVar(index)
-            plan_output += '{0} Time({1},{2}) -> '.format(
-                manager.IndexToNode(index), solution.Min(time_var), solution.Max(time_var))
-            index = solution.Value(routing.NextVar(index))
             node_index = manager.IndexToNode(index)
+            
+            # Display node index, time, and load in one line
+            plan_output += f'{node_index} Time({solution.Min(time_var)},{solution.Max(time_var)}) Load({route_loadLB}) -> '
+            
+            # Accumulate the route load
             route_loadLB += data['demands'][node_index]
-            loading_output += ' {0} Load({1}) -> '.format(node_index, route_loadLB)
             previous_index = index
-            route_distance += routing.GetArcCostForVehicle(previous_index, index, vehicle_id)
+            index = solution.Value(routing.NextVar(index))
+            
+            # Accumulate distance for the current arc
+            route_distance += data['distance_matrix'][manager.IndexToNode(previous_index)][manager.IndexToNode(index)]
+        
+        # Final stop at the depot
         time_var = time_dimension.CumulVar(index)
-        plan_output += '{0} Time({1},{2})\n'.format(manager.IndexToNode(index),
-                                                    solution.Min(time_var),
-                                                    solution.Max(time_var))
-        plan_output += 'Time of the route: {}min\n'.format(solution.Min(time_var))
-        plan_output += 'Distance of the route: {}m'.format(route_distance)
-        loading_output += 'Load of the route: {}\n'.format(route_loadLB)
+        node_index = manager.IndexToNode(index)
+        
+        # Add the final stop details (the depot) to the plan
+        plan_output += f'{node_index} Time({solution.Min(time_var)},{solution.Max(time_var)}) Load({route_loadLB})\n'
+        
+        # Display the total time, distance, and load for the vehicle
+        plan_output += f'Time of the route: {solution.Min(time_var)} min\n'
+        plan_output += f'Distance of the route: {route_distance} m\n'
+        plan_output += f'Load of the route: {route_loadLB}\n'
+        
+        # Print the result for the current vehicle
         print(plan_output)
-        print(loading_output)
+        
+        # Update totals across all vehicles
         total_distance += route_distance
         total_loadLB += route_loadLB
         total_time += solution.Min(time_var)
-    print('Total time of all routes: {}min'.format(total_time))
-    print('Total distance of all routes: {}m'.format(total_distance))
-    print('Total load of all routes: {}\n'.format(total_loadLB))
+    
+    # Print the overall totals for all vehicles
+    print(f'Total time of all routes: {total_time} min')
+    print(f'Total distance of all routes: {total_distance} m')
+    print(f'Total load of all routes: {total_loadLB}')
