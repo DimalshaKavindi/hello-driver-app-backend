@@ -1,6 +1,7 @@
 import requests
 import csv
 import json
+import time
 import urllib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
@@ -42,6 +43,7 @@ def create_data():
     data["vehicle_capacities"] = [40,50,50,50,50]
     data['num_vehicles'] = 5
     data['depot'] = 0
+
     
     return data
 
@@ -134,6 +136,9 @@ def create_data_model():
     data["vehicle_capacities"] = data_model["vehicle_capacities"]
     data["num_vehicles"] = data_model["num_vehicles"]
     data["depot"] = data_model["depot"]
+    data['service_time'] = [15] * len(data['time_matrix'])
+    data['service_time'][data['depot']] = 0
+    assert len(data['time_matrix']) == len(data['service_time'])
     
     return data
 
@@ -215,6 +220,28 @@ def solve_vrp():
     # routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
     # Capacity constraint
+    
+    node_visit_transit = [0] * routing.Size()
+    for index in range(routing.Size()):
+        node = manager.IndexToNode(index)
+        node_visit_transit[index] = data['service_time'][node]
+
+    break_intervals = {}
+    for v in range(manager.GetNumberOfVehicles()):
+        break_intervals[v] = [
+            routing.solver().FixedDurationIntervalVar(
+                240,  # Start between the 240th minute
+                300,  # End by the 300th minute
+                30,   # Break duration is 30 minutes
+                True,  # optional: no
+                f'Break for vehicle {v}')
+        ]
+        time_dimension.SetBreakIntervalsOfVehicle(
+            break_intervals[v],  # breaks
+            v,  # vehicle index
+            node_visit_transit)
+    # [END break_constraint]
+    
     def demand_callback(from_index):
         from_node = manager.IndexToNode(from_index)
         return data['demands'][from_node]
