@@ -39,8 +39,8 @@ def create_data():
     data['addresses'] = addresses
     data["demands"] = demands
     data["time_windows"] = time_windows
-    data["vehicle_capacities"] = [10, 10, 80, 20]
-    data['num_vehicles'] = 4
+    data["vehicle_capacities"] = [140,50,50]
+    data['num_vehicles'] = 3
     data['depot'] = 0
     
     return data
@@ -100,7 +100,7 @@ def build_time_matrix(response):
     time_matrix = []
     for row in response['rows']:
         row_list = [row['elements'][j]['duration']['value'] for j in range(len(row['elements']))]
-         # Convert seconds to minutes (or any unit you prefer)
+        # Convert seconds to minutes (or any unit you prefer)
         row_list = [time // 60 for time in row_list]  # Time in minutes
         time_matrix.append(row_list)
     return time_matrix
@@ -143,41 +143,35 @@ def solve_vrp():
     """Solves the CVRP and returns a structured solution."""
     data = create_data_model()
     #Create node index to variable index mapping
-    manager = pywrapcp.RoutingIndexManager(len(data['time_matrix']),len(data['vehicle_capacities']), data['depot']) 
-    # Create Routing Model
+    manager = pywrapcp.RoutingIndexManager(len(data['time_matrix']), len(data['vehicle_capacities']), data['depot']) 
     routing = pywrapcp.RoutingModel(manager)
 
-    # Create and register a transit callback
+    # Time callback
     def time_callback(from_index, to_index):
-        """Returns the travel time between the two nodes."""
-        # Convert from routing variable Index to time matrix NodeIndex.
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
         return data['time_matrix'][from_node][to_node]
 
     transit_callback_index = routing.RegisterTransitCallback(time_callback)
-    # Define cost of each arc.
     routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
-    # Add Time Windows constraint.
+    # Time dimension
     time = 'Time'
     routing.AddDimension(
         transit_callback_index,
-        10,  # allow waiting time (min)
-        1900,  # maximum time (min) per vehicle in a route (8 hours)
-        False,  # Don't force start cumul to zero.
+        10,  # allow waiting time
+        1900,  # maximum time
+        False,
         time)
     time_dimension = routing.GetDimensionOrDie(time)
 
-    # Add time window constraints for each location except depot - (one can define time window constraints for depot as well by small modifications in below code)
+    # Add time window constraints
     for location_idx, time_window in enumerate(data['time_windows']):
         if location_idx == data['depot']:
             continue
         index = manager.NodeToIndex(location_idx)
         time_dimension.CumulVar(index).SetRange(time_window[0], time_window[1])
 
-
-     # Add time window constraints for each vehicle start node.
     depot_idx = data['depot']
     for vehicle_id in range(len(data['vehicle_capacities'])):
         index = routing.Start(vehicle_id)
@@ -185,45 +179,89 @@ def solve_vrp():
             data['time_windows'][depot_idx][0],
             data['time_windows'][depot_idx][1])
 
-    # Instantiate route start and end times to produce feasible times.
     for i in range(len(data['vehicle_capacities'])):
         routing.AddVariableMinimizedByFinalizer(
             time_dimension.CumulVar(routing.Start(i)))
         routing.AddVariableMinimizedByFinalizer(
             time_dimension.CumulVar(routing.End(i)))
 
-    # Add Capacity Weight constraint.
+    # Capacity constraint
     def demand_callback(from_index):
-        # Convert from routing variable Index to demands NodeIndex.
         from_node = manager.IndexToNode(from_index)
         return data['demands'][from_node]
+
     demand_callback_index = routing.RegisterUnaryTransitCallback(demand_callback)
-    
-    # Add Capacity constraint.
     routing.AddDimensionWithVehicleCapacity(
         demand_callback_index,
-        0,  # null capacity slack
+        0,
         data['vehicle_capacities'],
-        True,  # start cumul to zero
-        "Capacity"
-    )
+        True,
+        "Capacity")
 
-    # Setting first solution heuristic.
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     search_parameters.first_solution_strategy = (
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
 
-    # Solve the problem.
     solution = routing.SolveWithParameters(search_parameters)
 
-    # Return the solution or raise an error.
     if solution:
-        return print_solution(data, manager, routing, solution)
+        print_solution(data, manager, routing, solution)
+        result = {}
+        for vehicle_id in range(len(data['vehicle_capacities'])):
+            index = routing.Start(vehicle_id)
+            vehicle_route = []
+            vehicle_loads = []
+            while not routing.IsEnd(index):
+                node_index = manager.IndexToNode(index)
+                vehicle_route.append(node_index)
+                vehicle_loads.append(data['demands'][node_index])
+                index = solution.Value(routing.NextVar(index))
+            vehicle_route.append(manager.IndexToNode(index))  # End node
+            result[vehicle_id] = {
+                'route': vehicle_route,
+                'loads': vehicle_loads,
+            }
+        return result
     else:
         raise HTTPException(status_code=500, detail="No solution found!")
 
 
-# function to print the results/solution
+def format_solution(data, manager, routing, solution):
+    """Formats the solution into a structured dictionary."""
+    routes = {}
+    total_distance = 0
+    total_load = 0
+
+    for vehicle_id in range(len(data['vehicle_capacities'])):
+        index = routing.Start(vehicle_id)
+        route = []
+        route_distance = 0
+        route_load = 0
+
+        while not routing.IsEnd(index):
+            node_index = manager.IndexToNode(index)
+            route.append(node_index)
+            route_load += data['demands'][node_index]
+            previous_index = index
+            index = solution.Value(routing.NextVar(index))
+            route_distance += routing.GetArcCostForVehicle(previous_index, index, vehicle_id)
+
+        # Capture end point and stats for each vehicle
+        routes[vehicle_id] = {
+            "route": route,
+            "distance": route_distance,
+            "load": route_load
+        }
+        total_distance += route_distance
+        total_load += route_load
+
+    # Final solution data
+    return {
+        "routes": routes,
+        "total_distance": total_distance,
+        "total_load": total_load
+    }
+
 # function to print the results/solution
 def print_solution(data, manager, routing, solution):
     print(f'Objective: {solution.ObjectiveValue()}')  # The objective function
