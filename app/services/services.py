@@ -41,8 +41,8 @@ def create_data():
     data['addresses'] = addresses
     data["demands"] = demands
     data["time_windows"] = time_windows
-    data["vehicle_capacities"] = [40,50,50,50,50]
-    data['num_vehicles'] = 5
+    data["vehicle_capacities"] = [2770,2770]
+    data['num_vehicles'] = 2
     data['depot'] = 0
     
     return data
