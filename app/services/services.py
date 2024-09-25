@@ -1,13 +1,12 @@
 import requests
 import csv
 import json
-import time
 import urllib
-import os
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from typing import List
 from datetime import datetime
+import os
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
 app = FastAPI()
@@ -45,7 +44,6 @@ def create_data():
     data["vehicle_capacities"] = [40,50,50,50,50]
     data['num_vehicles'] = 5
     data['depot'] = 0
-
     
     return data
 
@@ -138,7 +136,9 @@ def create_data_model():
     data["vehicle_capacities"] = data_model["vehicle_capacities"]
     data["num_vehicles"] = data_model["num_vehicles"]
     data["depot"] = data_model["depot"]
-    data['service_time'] = [15] * len(data['time_matrix'])
+
+    # 15 min of service time
+    data['service_time'] = [5] * len(data['time_matrix'])
     data['service_time'][data['depot']] = 0
     assert len(data['time_matrix']) == len(data['service_time'])
     
@@ -173,7 +173,8 @@ def solve_vrp():
     def time_callback(from_index, to_index):
         from_node = manager.IndexToNode(from_index)
         to_node = manager.IndexToNode(to_index)
-        return data['time_matrix'][from_node][to_node]
+        return data['time_matrix'][from_node][to_node] + data['service_time'][
+            from_node]
 
     time_callback_index = routing.RegisterTransitCallback(time_callback)
     routing.SetArcCostEvaluatorOfAllVehicles(time_callback_index)
@@ -182,11 +183,38 @@ def solve_vrp():
     time = 'Time'
     routing.AddDimension(
         time_callback_index,
-        10,  # allow waiting time
+        5,  # allow waiting time
         1900,  # maximum time
         False,
         time)
     time_dimension = routing.GetDimensionOrDie(time)
+    time_dimension.SetGlobalSpanCostCoefficient(10)
+
+    # Breaks
+    # [START break_constraint]
+    # warning: Need a pre-travel array using the solver's index order.
+
+    node_visit_transit = [0] * routing.Size()
+    for index in range(routing.Size()):
+        node = manager.IndexToNode(index)
+        node_visit_transit[index] = data['service_time'][node]
+
+    break_intervals = {}
+    for v in range(manager.GetNumberOfVehicles()):
+        break_intervals[v] = [
+        routing.solver().FixedDurationIntervalVar(
+            240,  # start min
+            300,  # start max
+            20,  # duration: 10 min
+            True,  # optional: yes
+            f'Break for vehicle {v}')
+        ]
+
+        time_dimension.SetBreakIntervalsOfVehicle(
+            break_intervals[v],  # breaks
+            v,  # vehicle index
+            node_visit_transit)
+    # [END break_constraint]
 
     # Add time window constraints
     for location_idx, time_window in enumerate(data['time_windows']):
@@ -222,28 +250,6 @@ def solve_vrp():
     # routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
     # Capacity constraint
-    
-    node_visit_transit = [0] * routing.Size()
-    for index in range(routing.Size()):
-        node = manager.IndexToNode(index)
-        node_visit_transit[index] = data['service_time'][node]
-
-    break_intervals = {}
-    for v in range(manager.GetNumberOfVehicles()):
-        break_intervals[v] = [
-            routing.solver().FixedDurationIntervalVar(
-                240,  # Start between the 240th minute
-                300,  # End by the 300th minute
-                30,   # Break duration is 30 minutes
-                True,  # optional: no
-                f'Break for vehicle {v}')
-        ]
-        time_dimension.SetBreakIntervalsOfVehicle(
-            break_intervals[v],  # breaks
-            v,  # vehicle index
-            node_visit_transit)
-    # [END break_constraint]
-    
     def demand_callback(from_index):
         from_node = manager.IndexToNode(from_index)
         return data['demands'][from_node]
