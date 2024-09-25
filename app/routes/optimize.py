@@ -54,9 +54,11 @@ def plot_routes():
         raise HTTPException(status_code=500, detail="No valid VRP solution found.")
 
     try:
-        csv_file_path = os.path.join(os.path.dirname(file), '..', 'models', 'orders.csv')
+       
+        csv_file_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'orders.csv')
         csv_file_path = os.path.normpath(csv_file_path)
-        
+
+        # Then in your function:
         addresses, demands, time_windows = read_data_from_csv(csv_file_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error reading data from CSV: {e}")

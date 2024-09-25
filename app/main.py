@@ -5,7 +5,7 @@ from app.routes import optimize  # Import the optimize router if it exists
 app = FastAPI()
 
 # Include the router for handling driver, schedule, and order-related requests
-app.include_router(driver.router, prefix="/api/v1", tags=["drivers"])
+app.include_router(driver.router, prefix="/api/driver", tags=["drivers"])
 
 # Include the router for the route optimization functionality
 
