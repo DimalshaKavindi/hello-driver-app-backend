@@ -3,6 +3,7 @@ import csv
 import json
 import time
 import urllib
+import os
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from typing import List
@@ -32,7 +33,8 @@ def read_data_from_csv(file_path):
 
 
 def create_data():
-    file_path = r'D:\Intern\hello-driver-app-backend\app\models\orders.csv'
+    csv_file_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'orders.csv')
+    file_path = os.path.normpath(csv_file_path)
     addresses, demands, time_windows = read_data_from_csv(file_path)
     
     data = {}
