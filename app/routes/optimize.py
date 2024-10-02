@@ -1,12 +1,18 @@
-from fastapi import APIRouter, HTTPException
-from typing import List
+from fastapi import APIRouter, HTTPException,Depends
 from app.services.services import solve_vrp, create_data, create_matrix, read_data_from_csv
 import folium
 from fastapi.responses import HTMLResponse
-from typing import List
 import os
 import polyline
 import requests
+from sqlalchemy.orm import Session
+from app.models import models
+from app.database.database import get_db
+from typing import List
+from pydantic import BaseModel
+# from app.schemas.schemas import RoutesBase, VehicleRouteBase, OrderBase
+from fastapi.responses import JSONResponse
+import json 
 
 router = APIRouter()
 
@@ -21,16 +27,14 @@ async def get_distance_matrix():
         raise HTTPException(status_code=500, detail=f"Error building distance matrix: {e}")
 
 
-@router.get("/solve_vrp")
+# FastAPI route to return the solution as JSON
+@router.get("/solve_vrp", response_class=JSONResponse)
 async def solve_vrp_endpoint():
     try:
-        solve_vrp()
-        return {"message": "VRP solution calculated and printed in the console."}
+        result = solve_vrp()
+        return JSONResponse(content=json.loads(result))  # Convert string to JSON
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error solving VRP: {e}")
-
-
-
 
 # Function to get route from Google Directions API
 def get_route_from_google_directions(start, end, API_key):
@@ -48,6 +52,7 @@ def get_route_from_google_directions(start, end, API_key):
 
 @router.get("/plot_routes", response_class=HTMLResponse)
 def plot_routes():
+
     solution_data = solve_vrp()
 
     if solution_data is None or not isinstance(solution_data, dict):
@@ -149,3 +154,47 @@ def plot_routes():
         map_html = file.read()
 
     return HTMLResponse(content=map_html)
+
+# @router.post("/add_routes")
+# async def create_route(route: RoutesBase, db: Session = Depends(get_db)):
+#     # 1. Create the main route record in the Routes table
+#     db_route = models.Routes(
+#         no_of_orders=route.no_of_orders,
+#         total_weight=route.total_weight,
+#         total_distance=route.total_distance,
+#         total_time=route.total_time
+#     )
+#     db.add(db_route)  # Add it to the session
+#     db.commit()  # Commit to save
+#     db.refresh(db_route)  # Refresh to get the ID back
+
+#     # 2. Create vehicle routes for each vehicle in the route
+#     for vehicle_route in route.vehicle_routes:
+#         db_vehicle_route = models.VehicleRoute(
+#             routes_id=db_route.id,  # Link to the main Routes table
+#             no_of_orders_for_route=vehicle_route.no_of_orders_for_route,
+#             total_weight_for_route=vehicle_route.total_weight_for_route,
+#             total_distance_for_route=vehicle_route.total_distance_for_route,
+#             total_time_for_route=vehicle_route.total_time_for_route
+#         )
+#         db.add(db_vehicle_route)  # Add to the session
+#         db.commit()
+#         db.refresh(db_vehicle_route)  # Get the new ID
+        
+#         # 3. Save orders associated with each vehicle route
+#         for order in vehicle_route.orders:
+#             db_order = models.Orders(
+#                 order_id=order.order_id,
+#                 order_weight=order.order_weight,
+#                 latitude=order.latitude,
+#                 longitude=order.longitude,
+#                 arrive_time=order.arrive_time,
+#                 vehicle_route_id=db_vehicle_route.id  # Link to VehicleRoute
+#             )
+#             db.add(db_order)
+
+#     # 4. Commit all the changes to the database
+#     db.commit()
+    
+#     # 5. Return success message
+#     return {"message": "Routes saved successfully"}
