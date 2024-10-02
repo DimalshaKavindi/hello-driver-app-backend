@@ -7,6 +7,7 @@ import polyline
 import requests
 from sqlalchemy.orm import Session
 from app.models import models
+from app.database import database
 from app.database.database import get_db
 from typing import List
 from pydantic import BaseModel
@@ -155,46 +156,52 @@ def plot_routes():
 
     return HTMLResponse(content=map_html)
 
-# @router.post("/add_routes")
-# async def create_route(route: RoutesBase, db: Session = Depends(get_db)):
-#     # 1. Create the main route record in the Routes table
-#     db_route = models.Routes(
-#         no_of_orders=route.no_of_orders,
-#         total_weight=route.total_weight,
-#         total_distance=route.total_distance,
-#         total_time=route.total_time
-#     )
-#     db.add(db_route)  # Add it to the session
-#     db.commit()  # Commit to save
-#     db.refresh(db_route)  # Refresh to get the ID back
 
-#     # 2. Create vehicle routes for each vehicle in the route
-#     for vehicle_route in route.vehicle_routes:
-#         db_vehicle_route = models.VehicleRoute(
-#             routes_id=db_route.id,  # Link to the main Routes table
-#             no_of_orders_for_route=vehicle_route.no_of_orders_for_route,
-#             total_weight_for_route=vehicle_route.total_weight_for_route,
-#             total_distance_for_route=vehicle_route.total_distance_for_route,
-#             total_time_for_route=vehicle_route.total_time_for_route
-#         )
-#         db.add(db_vehicle_route)  # Add to the session
-#         db.commit()
-#         db.refresh(db_vehicle_route)  # Get the new ID
-        
-#         # 3. Save orders associated with each vehicle route
-#         for order in vehicle_route.orders:
-#             db_order = models.Orders(
-#                 order_id=order.order_id,
-#                 order_weight=order.order_weight,
-#                 latitude=order.latitude,
-#                 longitude=order.longitude,
-#                 arrive_time=order.arrive_time,
-#                 vehicle_route_id=db_vehicle_route.id  # Link to VehicleRoute
-#             )
-#             db.add(db_order)
 
-#     # 4. Commit all the changes to the database
-#     db.commit()
-    
-#     # 5. Return success message
-#     return {"message": "Routes saved successfully"}
+
+def save_solution_to_db(db: Session, result: dict):
+    route_data = result['routes']
+
+    # Create Route entry
+    db_route = models.Routes(
+        total_distance=route_data['total_distance'],
+        total_time=route_data['total_time'],
+        total_weight=route_data['total_load']
+    )
+    db.add(db_route)
+    db.commit()
+    db.refresh(db_route)
+
+    # Create VehicleRoute and Order entries
+    for vehicle_route_data in route_data['vehicle_routes']:
+        db_vehicle_route = models.VehicleRoute(
+            vehicle_id=vehicle_route_data['vehicle_id'],
+            no_of_orders_for_route=vehicle_route_data['no_of_orders_for_route'],
+            total_weight_for_route=vehicle_route_data['total_weight_for_route'],
+            total_distance_for_route=vehicle_route_data['total_distance_for_route'],
+            total_time_for_route=vehicle_route_data['total_time_for_route'],
+            routes_id=db_route.id
+        )
+        db.add(db_vehicle_route)
+        db.commit()
+        db.refresh(db_vehicle_route)
+
+        for order_data in vehicle_route_data['orders']:
+            db_order = models.Orders(
+                order_id=order_data['order_id'],
+                order_weight=order_data['order_weight'],
+                latitude=order_data['latitude'],
+                longitude=order_data['longitude'],
+                arrive_time=order_data['arrive_time'],
+                vehicle_route_id=db_vehicle_route.id
+            )
+            db.add(db_order)
+
+    db.commit()
+
+@router.post("/solve")
+def solve_vrp_endpoint(db: Session = Depends(get_db)):
+    result = solve_vrp()
+  # Call your solve function to get the result
+    save_solution_to_db(db, json.loads(result))  # Save the result in the database
+    return {"message": "Solution saved successfully", "result": json.loads(result)}

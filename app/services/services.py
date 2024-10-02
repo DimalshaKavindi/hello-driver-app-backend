@@ -47,8 +47,8 @@ def create_data():
     data['addresses'] = addresses
     data["demands"] = demands
     data["time_windows"] = time_windows
-    data["vehicle_capacities"] = [2770,2770,2700]
-    data['num_vehicles'] = 3
+    data["vehicle_capacities"] = [2770,2770]
+    data['num_vehicles'] = 2
     data['depot'] = 0
     
     return data
@@ -260,6 +260,7 @@ def solve_vrp():
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
 
     solution = routing.SolveWithParameters(search_parameters)
+   
 
     if solution:
         print_solution(data, manager, routing, solution)
@@ -272,7 +273,7 @@ def solve_vrp():
 def format_solution_json(data, manager, routing, solution):
     """Formats the solution into the desired JSON structure."""
     result = {
-        "route": {
+        "routes": {
             "total_distance":0,
             "total_time":0,
             "total_load" :0,
@@ -321,7 +322,7 @@ def format_solution_json(data, manager, routing, solution):
         route_time = solution.Max(time_dimension.CumulVar(index))
 
         # Append the complete vehicle route to result["route"]["vehicle_routes"]
-        result["route"]["vehicle_routes"].append({
+        result["routes"]["vehicle_routes"].append({
             "vehicle_id": vehicle_id,
             "no_of_orders_for_route": len(route_orders),
             "total_weight_for_route": route_load,
@@ -336,9 +337,9 @@ def format_solution_json(data, manager, routing, solution):
         total_time += route_time
 
     # Add overall totals to the result under the "route" key
-    result["route"]["total_distance"] = total_distance
-    result["route"]["total_time"] = total_time
-    result["route"]["total_load"] = total_load
+    result["routes"]["total_distance"] = total_distance
+    result["routes"]["total_time"] = total_time
+    result["routes"]["total_load"] = total_load
 
     return result
 
@@ -386,15 +387,7 @@ def format_solution(data, manager, routing, solution):
 # function to print the results/solution
 def print_solution(data, manager, routing, solution):
     print(f'Objective: {solution.ObjectiveValue()}')  # The objective function
-    #  # Display dropped nodes.
-    # dropped_nodes = "Dropped nodes:"
-    # for node in range(routing.Size()):
-    #     if routing.IsStart(node) or routing.IsEnd(node):
-    #         continue
-    #     if solution.Value(routing.NextVar(node)) == node:
-    #         dropped_nodes += f" {manager.IndexToNode(node)}"
-    # print(dropped_nodes)
-
+    
     # Display routes
     time_dimension = routing.GetDimensionOrDie('Time')
     total_time = 0
