@@ -5,7 +5,7 @@ import urllib
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from typing import List
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 
@@ -15,6 +15,12 @@ def time_to_minutes(time_str):
     """Convert time string (e.g., '8:00AM') to minutes since midnight."""
     dt = datetime.strptime(time_str, '%I:%M%p')
     return (dt.hour-8) * 60 + dt.minute
+
+def minutes_to_time(minutes):
+    """Convert minutes since 8:00 AM to a time string (e.g., '8:00AM')."""
+    base_time = datetime.strptime('8:00AM', '%I:%M%p')
+    time_after_minutes = base_time + timedelta(minutes=minutes)
+    return time_after_minutes.strftime('%I:%M%p').lstrip('0')  
 
 def read_data_from_csv(file_path):
     df = pd.read_csv(file_path)
@@ -41,8 +47,8 @@ def create_data():
     data['addresses'] = addresses
     data["demands"] = demands
     data["time_windows"] = time_windows
-    data["vehicle_capacities"] = [2770,2770]
-    data['num_vehicles'] = 2
+    data["vehicle_capacities"] = [2770,2770,2700]
+    data['num_vehicles'] = 3
     data['depot'] = 0
     
     return data
@@ -205,7 +211,7 @@ def solve_vrp():
         routing.solver().FixedDurationIntervalVar(
             240,  # start min
             300,  # start max
-            20,  # duration: 10 min
+            0,  # duration: 10 min
             True,  # optional: yes
             f'Break for vehicle {v}')
         ]
@@ -280,24 +286,88 @@ def solve_vrp():
 
     if solution:
         print_solution(data, manager, routing, solution)
-        result = {}
-        for vehicle_id in range(len(data['vehicle_capacities'])):
-            index = routing.Start(vehicle_id)
-            vehicle_route = []
-            vehicle_loads = []
-            while not routing.IsEnd(index):
-                node_index = manager.IndexToNode(index)
-                vehicle_route.append(node_index)
-                vehicle_loads.append(data['demands'][node_index])
-                index = solution.Value(routing.NextVar(index))
-            vehicle_route.append(manager.IndexToNode(index))  # End node
-            result[vehicle_id] = {
-                'route': vehicle_route,
-                'loads': vehicle_loads,
-            }
-        return result
+        result = format_solution_json(data, manager, routing, solution)
+        return json.dumps(result, indent=4)
     else:
         raise HTTPException(status_code=500, detail="No solution found!")
+
+
+def format_solution_json(data, manager, routing, solution):
+    """Formats the solution into the desired JSON structure."""
+    result = {
+        "route": {
+            "total_distance":0,
+            "total_time":0,
+            "total_load" :0,
+            "vehicle_routes": []
+        }
+    }
+
+    address_data = create_data()
+    time_dimension = routing.GetDimensionOrDie('Time')
+
+    # Initialize total values
+    total_time = 0
+    total_distance = 0
+    total_load = 0
+
+    for vehicle_id in range(len(data['vehicle_capacities'])):
+        index = routing.Start(vehicle_id)
+        route_orders = []
+        route_distance = 0
+        route_load = 0
+
+        while not routing.IsEnd(index):
+            time_var = time_dimension.CumulVar(index)
+            node_index = manager.IndexToNode(index)
+
+            order_time_min = solution.Min(time_var)
+            order_time_max = solution.Max(time_var)
+
+            # Creating order details for each node in the route
+            order = {
+                "id": node_index,
+                "order_id": node_index + 1,  # Assuming order_id is node_index + 1
+                "order_weight": data['demands'][node_index],
+                "latitude": address_data['addresses'][node_index][0],
+                "longitude": address_data['addresses'][node_index][1],
+                "arrive_time": f"{minutes_to_time(order_time_min)} - {minutes_to_time(order_time_max)}"
+            }
+            route_orders.append(order)
+            route_load += data['demands'][node_index]
+
+            previous_index = index
+            index = solution.Value(routing.NextVar(index))
+            route_distance += data['distance_matrix'][manager.IndexToNode(previous_index)][manager.IndexToNode(index)]
+
+        # Once the route for this vehicle is processed, compute the total route time
+        route_time = solution.Max(time_dimension.CumulVar(index))
+
+        # Append the complete vehicle route to result["route"]["vehicle_routes"]
+        result["route"]["vehicle_routes"].append({
+            "vehicle_id": vehicle_id,
+            "no_of_orders_for_route": len(route_orders),
+            "total_weight_for_route": route_load,
+            "total_distance_for_route": route_distance,
+            "total_time_for_route": route_time,
+            "orders": route_orders
+        })
+
+        # Accumulate total distance, load, and time across all vehicles
+        total_distance += route_distance
+        total_load += route_load
+        total_time += route_time
+
+    # Add overall totals to the result under the "route" key
+    result["route"]["total_distance"] = total_distance
+    result["route"]["total_time"] = total_time
+    result["route"]["total_load"] = total_load
+
+    return result
+
+
+
+
 
 
 def format_solution(data, manager, routing, solution):
