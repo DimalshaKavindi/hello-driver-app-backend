@@ -60,7 +60,6 @@ def plot_routes():
         raise HTTPException(status_code=500, detail="No valid VRP solution found.")
 
     try:
-       
         csv_file_path = os.path.join(os.path.dirname(__file__), '..', 'models', 'orders.csv')
         csv_file_path = os.path.normpath(csv_file_path)
 
