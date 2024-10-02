@@ -1,0 +1,384 @@
+{
+  "Deport Address": {
+    "address": {
+      "location_name": "HelloWash Laundry & Dry Clean Factory Co.Ltd",
+      "latitude": 11.519855,
+      "longitude": 104.934508
+    },
+    "working time": {
+      "from": "8:00AM",
+      "to": "11:00PM"
+    }
+  },
+  "Vehicle Details": {
+    "No of Vehicles": 2,
+    "Service Time": 5,
+    "working time": {
+      "from": "8:00AM",
+      "to": "11:00PM",
+      "Time duration": 20
+    },
+    "Vehicle List": [
+      {
+        "Vehicle_id": 1,
+        "Maximum weight": 2700
+      },
+      {
+        "Vehicle_id": 2,
+        "Maximum weight": 2700
+      }
+    ]
+  },
+  "orders": [
+    {
+      "id": 0,
+      "order_no": "0",
+      "order_weight": 0,
+      "address": {
+        "location_name": "HelloWash Laundry & Dry Clean Factory Co.Ltd",
+        "latitude": 11.519855,
+        "longitude": 104.934508
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:00PM"
+      }
+    },
+    {
+      "id": 1,
+      "order_no": "1870",
+      "order_weight": 12,
+      "address": {
+        "location_name": "Tuol Sleng Genocide Museum",
+        "latitude": 11.552482,
+        "longitude": 104.933399
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:59AM"
+      }
+    },
+    {
+      "id": 2,
+      "order_no": "1094",
+      "order_weight": 7,
+      "address": {
+        "location_name": "Independence Monument",
+        "latitude": 11.544872,
+        "longitude": 104.928413
+      },
+      "open_window": {
+        "from": "12:01PM",
+        "to": "4:59PM"
+      }
+    },
+    {
+      "id": 3,
+      "order_no": "1478",
+      "order_weight": 28,
+      "address": {
+        "location_name": "Royal Palace",
+        "latitude": 11.550041,
+        "longitude": 104.934402
+      },
+      "open_window": {
+        "from": "12:01PM",
+        "to": "4:59PM"
+      }
+    },
+    {
+      "id": 4,
+      "order_no": "1378",
+      "order_weight": 5,
+      "address": {
+        "location_name": "Exchange Square Mall",
+        "latitude": 11.573182,
+        "longitude": 104.923245
+      },
+      "open_window": {
+        "from": "5:00PM",
+        "to": "9:00PM"
+      }
+    },
+    {
+      "id": 5,
+      "order_no": "1065",
+      "order_weight": 1,
+      "address": {
+        "location_name": "Western International School",
+        "latitude": 11.589118,
+        "longitude": 104.897911
+      },
+      "open_window": {
+        "from": "5:00PM",
+        "to": "9:00PM"
+      }
+    },
+    {
+      "id": 6,
+      "order_no": "1164",
+      "order_weight": 25,
+      "address": {
+        "location_name": "Phnom Penh Tower",
+        "latitude": 11.548522,
+        "longitude": 104.931116
+      },
+      "open_window": {
+        "from": "12:01PM",
+        "to": "4:59PM"
+      }
+    },
+    {
+      "id": 7,
+      "order_no": "1990",
+      "order_weight": 3,
+      "address": {
+        "location_name": "BKK Market",
+        "latitude": 11.555217,
+        "longitude": 104.926641
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:59AM"
+      }
+    },
+    {
+      "id": 8,
+      "order_no": "1698",
+      "order_weight": 25,
+      "address": {
+        "location_name": "Sovanna Shopping Center",
+        "latitude": 11.594891,
+        "longitude": 104.900748
+      },
+      "open_window": {
+        "from": "5:00PM",
+        "to": "9:00PM"
+      }
+    },
+    {
+      "id": 9,
+      "order_no": "1441",
+      "order_weight": 17,
+      "address": {
+        "location_name": "Old French Quarter",
+        "latitude": 11.571922,
+        "longitude": 104.921837
+      },
+      "open_window": {
+        "from": "5:00PM",
+        "to": "9:00PM"
+      }
+    },
+    {
+      "id": 10,
+      "order_no": "1207",
+      "order_weight": 10,
+      "address": {
+        "location_name": "Independence School",
+        "latitude": 11.595234,
+        "longitude": 104.899892
+      },
+      "open_window": {
+        "from": "12:01PM",
+        "to": "4:59PM"
+      }
+    },
+    {
+      "id": 11,
+      "order_no": "1343",
+      "order_weight": 26,
+      "address": {
+        "location_name": "Moscow Market",
+        "latitude": 11.573832,
+        "longitude": 104.913492
+      },
+      "open_window": {
+        "from": "5:00PM",
+        "to": "9:00PM"
+      }
+    },
+    {
+      "id": 12,
+      "order_no": "1438",
+      "order_weight": 28,
+      "address": {
+        "location_name": "BKK Market",
+        "latitude": 11.555217,
+        "longitude": 104.926641
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:59AM"
+      }
+    },
+    {
+      "id": 13,
+      "order_no": "1761",
+      "order_weight": 5,
+      "address": {
+        "location_name": "BKK Market",
+        "latitude": 11.555217,
+        "longitude": 104.926641
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:59AM"
+      }
+    },
+    {
+      "id": 14,
+      "order_no": "1328",
+      "order_weight": 15,
+      "address": {
+        "location_name": "Riverside",
+        "latitude": 11.560042,
+        "longitude": 104.929001
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:59AM"
+      }
+    },
+    {
+      "id": 15,
+      "order_no": "1261",
+      "order_weight": 17,
+      "address": {
+        "location_name": "TK Avenue Mall",
+        "latitude": 11.590821,
+        "longitude": 104.89871
+      },
+      "open_window": {
+        "from": "5:00PM",
+        "to": "9:00PM"
+      }
+    },
+    {
+      "id": 16,
+      "order_no": "1724",
+      "order_weight": 23,
+      "address": {
+        "location_name": "Paragon Mall",
+        "latitude": 11.590121,
+        "longitude": 104.8989
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:59AM"
+      }
+    },
+    {
+      "id": 17,
+      "order_no": "1739",
+      "order_weight": 30,
+      "address": {
+        "location_name": "Tuol Kork Cinema",
+        "latitude": 11.591938,
+        "longitude": 104.899099
+      },
+      "open_window": {
+        "from": "12:01PM",
+        "to": "4:59PM"
+      }
+    },
+    {
+      "id": 18,
+      "order_no": "1617",
+      "order_weight": 20,
+      "address": {
+        "location_name": "Starmart 51",
+        "latitude": 11.570927,
+        "longitude": 104.918242
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:59AM"
+      }
+    },
+    {
+      "id": 19,
+      "order_no": "1981",
+      "order_weight": 6,
+      "address": {
+        "location_name": "Central Market",
+        "latitude": 11.568639,
+        "longitude": 104.922703
+      },
+      "open_window": {
+        "from": "12:01PM",
+        "to": "4:59PM"
+      }
+    },
+    {
+      "id": 20,
+      "order_no": "1130",
+      "order_weight": 10,
+      "address": {
+        "location_name": "Phnom Penh Night Market",
+        "latitude": 11.570827,
+        "longitude": 104.922803
+      },
+      "open_window": {
+        "from": "5:00PM",
+        "to": "9:00PM"
+      }
+    },
+    {
+      "id": 21,
+      "order_no": "1538",
+      "order_weight": 29,
+      "address": {
+        "location_name": "Central Market",
+        "latitude": 11.568539,
+        "longitude": 104.926839
+      },
+      "open_window": {
+        "from": "12:01PM",
+        "to": "4:59PM"
+      }
+    },
+    {
+      "id": 22,
+      "order_no": "1249",
+      "order_weight": 29,
+      "address": {
+        "location_name": "Wat Phnom",
+        "latitude": 11.574128,
+        "longitude": 104.923594
+      },
+      "open_window": {
+        "from": "5:00PM",
+        "to": "9:00PM"
+      }
+    },
+    {
+      "id": 23,
+      "order_no": "1288",
+      "order_weight": 11,
+      "address": {
+        "location_name": "Orussey Market",
+        "latitude": 11.570421,
+        "longitude": 104.915122
+      },
+      "open_window": {
+        "from": "12:01PM",
+        "to": "4:59PM"
+      }
+    },
+    {
+      "id": 24,
+      "order_no": "1663",
+      "order_weight": 17,
+      "address": {
+        "location_name": "Riverside",
+        "latitude": 11.560042,
+        "longitude": 104.929001
+      },
+      "open_window": {
+        "from": "8:00AM",
+        "to": "11:59AM"
+      }
+    }
+  ]
+}
