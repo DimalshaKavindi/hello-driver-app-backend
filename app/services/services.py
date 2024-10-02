@@ -242,19 +242,6 @@ def solve_vrp():
         routing.AddVariableMinimizedByFinalizer(
             time_dimension.CumulVar(routing.End(i)))
 
-    # # Create and register a transit callback.
-    # def distance_callback(from_index, to_index):
-    #     """Returns the distance between the two nodes."""
-    #     # Convert from routing variable Index to distance matrix NodeIndex.
-    #     from_node = manager.IndexToNode(from_index)
-    #     to_node = manager.IndexToNode(to_index)
-    #     return data["distance_matrix"][from_node][to_node]
-
-    # transit_callback_index = routing.RegisterTransitCallback(distance_callback)
-
-    # # Define cost of each arc.
-    # routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
-
     # Capacity constraint
     def demand_callback(from_index):
         from_node = manager.IndexToNode(from_index)
@@ -268,21 +255,11 @@ def solve_vrp():
         True,
         "Capacity")
 
-    # # Allow to drop nodes.
-    # penalty = 1000000
-    # for node in range(1, len(data["distance_matrix"])):
-    #     routing.AddDisjunction([manager.NodeToIndex(node)], penalty)
-
     search_parameters = pywrapcp.DefaultRoutingSearchParameters()
     search_parameters.first_solution_strategy = (
         routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
-    # search_parameters.local_search_metaheuristic = (
-    #     routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
-    # )
-    # search_parameters.time_limit.FromSeconds(30)
 
     solution = routing.SolveWithParameters(search_parameters)
-   
 
     if solution:
         print_solution(data, manager, routing, solution)
