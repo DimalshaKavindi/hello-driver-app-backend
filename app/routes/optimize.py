@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException,Depends
-from app.services.services import solve_vrp, create_data, create_matrix, read_data_from_csv
+from app.services.vrp_services import solve_vrp
+from app.utils.data_reader import create_data, read_data_from_csv
+from app.utils.matrix import create_matrix
 import folium
 from fastapi.responses import HTMLResponse
 import os
